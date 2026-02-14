@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Price Alert - 价格监控</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; }
+    
+    .header { background: #1a1a2e; color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 1.25rem; }
+    .header .status { font-size: 0.75rem; color: #4ade80; }
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    .user-info { font-size: 0.85rem; color: #9ca3af; }
+    .user-info .role { background: #4f46e5; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px; }
+    
+    .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    
+    .card { background: white; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card h2 { font-size: 1rem; margin-bottom: 1rem; color: #1a1a2e; }
+    .card h3 { font-size: 0.9rem; margin-bottom: 0.75rem; color: #374151; border-bottom: 1px solid #f3f4f6; padding-bottom: 0.5rem; }
+    
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.875rem; margin-bottom: 0.375rem; color: #666; }
+    .form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #4f46e5; }
+    
+    .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+    
+    .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; }
+    .btn-primary { background: #4f46e5; color: white; }
+    .btn-secondary { background: #e5e7eb; color: #374151; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-success { background: #10b981; color: white; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+    .btn-warning { background: #f59e0b; color: white; }
+    
+    .alert-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #f3f4f6; }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-info { flex: 1; }
+    .alert-symbol { font-weight: 600; color: #1a1a2e; }
+    .alert-condition { font-size: 0.8rem; color: #6b7280; }
+    .alert-actions { display: flex; gap: 0.5rem; }
+    
+    .badge { display: inline-block; padding: 0.125rem 0.375rem; border-radius: 9999px; font-size: 0.7rem; margin-left: 0.5rem; }
+    .badge-enabled { background: #d1fae5; color: #065f46; }
+    .badge-disabled { background: #f3f4f6; color: #6b7280; }
+    
+    .nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .nav-btn { padding: 0.5rem 1rem; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+    .nav-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; }
+    
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #f3f4f6; }
+    th { background: #f9fafb; font-weight: 600; color: #374151; }
+    .status-success { color: #10b981; }
+    .status-failed { color: #ef4444; }
+    .status-pending { color: #f59e0b; }
+    
+    .login-page { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+    .login-box { background: white; padding: 2rem; border-radius: 8px; width: 100%; max-width: 360px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .login-box h2 { text-align: center; margin-bottom: 1.5rem; }
+    .login-tabs { display: flex; margin-bottom: 1rem; border-bottom: 1px solid #e5e7eb; }
+    .login-tab { flex: 1; padding: 0.5rem; text-align: center; cursor: pointer; border-bottom: 2px solid transparent; }
+    .login-tab.active { border-bottom-color: #4f46e5; color: #4f46e5; }
+    
+    .hidden { display: none !important; }
+    
+    .toast { position: fixed; bottom: 1rem; right: 1rem; background: #1a1a2e; color: white; padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.875rem; z-index: 1000; animation: slideIn 0.3s ease; }
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    
+    .empty-state { text-align: center; padding: 2rem; color: #9ca3af; }
+    
+    .user-table td { vertical-align: middle; }
+    .user-table .role-admin { color: #f59e0b; font-weight: 600; }
+    .user-table .role-user { color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔔 Price Alert</h1>
+    <div class="header-right">
+      <span class="status" id="engineStatus">引擎运行中</span>
+      <span class="user-info hidden" id="userInfo">
+        <span id="currentUsername"></span>
+        <span class="role" id="currentRole"></span>
+      </span>
+      <button class="btn btn-secondary btn-sm hidden" id="logoutBtn" onclick="logout()">退出</button>
+    </div>
+  </div>
+  
+  <!-- Login Page -->
+  <div id="loginPage" class="container login-page hidden">
+    <div class="login-box">
+      <h2>🔐 登录</h2>
+      
+      <!-- 登录表单 -->
+      <div id="loginForm">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="loginUsername" placeholder="用户名">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="loginPassword" placeholder="密码">
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="doLogin()">登录</button>
+      </div>
+      
+      <p style="text-align: center; margin-top: 1rem; font-size: 0.8rem; color: #6b7280;">
+        注册已禁用，请联系管理员创建用户
+      </p>
+    </div>
+  </div>
+  
+  <!-- Main App -->
+  <div id="mainApp" class="container hidden">
+    <div class="nav">
+      <button class="nav-btn active" onclick="showTab('dashboard')">概览</button>
+      <button class="nav-btn" onclick="showTab('alerts')">监控规则</button>
+      <button class="nav-btn" onclick="showTab('events')">触发日志</button>
+      <button class="nav-btn" onclick="showTab('settings')">系统设置</button>
+      <button class="nav-btn" onclick="showTab('help')">帮助</button>
+      <button class="nav-btn hidden" id="adminUsersBtn" onclick="showTab('users')">用户管理</button>
+    </div>
+    
+    <!-- Dashboard Tab -->
+    <div id="dashboardTab" class="hidden">
+      <div class="card">
+        <h2>📊 概览</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+          <div style="background: #f3f4f6; padding: 1rem; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2rem; font-weight: bold; color: #4f46e5;" id="dashAlerts">0</div>
+            <div style="font-size: 0.85rem; color: #6b7280;">监控规则</div>
+          </div>
+          <div style="background: #f3f4f6; padding: 1rem; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2rem; font-weight: bold; color: #10b981;" id="dashEnabled">0</div>
+            <div style="font-size: 0.85rem; color: #6b7280;">已启用</div>
+          </div>
+          <div style="background: #f3f4f6; padding: 1rem; border-radius: 8px; text-align: center;">
+            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="dashEvents">0</div>
+            <div style="font-size: 0.85rem; color: #6b7280;">触发记录</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2>⚡ 快速操作</h2>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;">
+          <button class="btn btn-primary" onclick="showTab('alerts');document.getElementById('alertForm').scrollIntoView({behavior: 'smooth'})">➕ 新建规则</button>
+          <button class="btn btn-secondary" onclick="loadEvents(); showTab('events')">📜 查看日志</button>
+          <button class="btn btn-secondary" onclick="showTab('settings')">⚙️ 系统设置</button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2>📋 已配置的规则</h2>
+        <div id="dashboardAlertsList"></div>
+      </div>
+    </div>
+    
+    <!-- Alerts Tab -->
+    <div id="alertsTab">
+      <div class="card">
+        <h2>➕ 新建规则</h2>
+        <form id="alertForm" onsubmit="createAlert(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label>交易对</label>
+              <input type="text" name="symbol" placeholder="BTCUSDT" required style="text-transform: uppercase;">
+            </div>
+            <div class="form-group">
+              <label>条件类型</label>
+              <select name="condition_type" required>
+                <option value="cross_up">上穿 (cross_up)</option>
+                <option value="cross_down">下穿 (cross_down)</option>
+                <option value="price_gte">价格 ≥</option>
+                <option value="price_lte">价格 ≤</option>
+                <option value="pct_change_up">涨幅 ≥ (%)</option>
+                <option value="pct_change_down">跌幅 ≥ (%)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>阈值</label>
+              <input type="number" name="threshold" placeholder="52000" step="any" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>轮询间隔 (秒) ⏱️ 多少秒获取一次价格</label>
+              <input type="number" name="poll_interval_sec" value="60" min="1" max="3600" required>
+            </div>
+            <div class="form-group">
+              <label>冷却时间 (秒) ⏰ 触发后多久内不再触发</label>
+              <input type="number" name="cooldown_sec" value="300" min="0" required>
+            </div>
+            <div class="form-group">
+              <label>提醒次数 🔔 触发后发送几次通知 (1-10)</label>
+              <input type="number" name="notify_times" value="1" min="1" max="10" required>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+              <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" name="is_enabled" checked> 启用
+              </label>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">创建规则</button>
+        </form>
+      </div>
+      
+      <div class="card">
+        <h2>📋 规则列表</h2>
+        <div id="alertsList"></div>
+      </div>
+    </div>
+    
+    <!-- Events Tab -->
+    <div id="eventsTab" class="hidden">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>📜 触发日志</h2>
+          <div>
+            <input type="text" id="eventSymbolFilter" placeholder="筛选交易对" style="padding: 0.25rem 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            <button class="btn btn-secondary btn-sm" onclick="loadEvents()">刷新</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table id="eventsTable">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>类型</th>
+                <th>原因</th>
+                <th>价格</th>
+                <th>阈值</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Settings Tab -->
+    <div id="settingsTab" class="hidden">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2>⚙️ Telegram 配置</h2>
+          <span id="telegramStatus" style="font-size: 0.8rem; padding: 4px 12px; border-radius: 12px; background: #f3f4f6; color: #6b7280;">未配置</span>
+        </div>
+        <p style="font-size: 0.8rem; color: #6b7280; margin-bottom: 1rem;">每个用户独立配置，仅自己收到通知</p>
+        
+        <!-- 已配置的 Telegram 显示 -->
+        <div id="telegramInfo" class="hidden" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 600; color: #166534;">✅ 已配置的 Telegram</div>
+            <button class="btn btn-danger btn-sm" onclick="deleteTelegramConfig()">删除配置</button>
+          </div>
+          <div style="font-size: 0.85rem; color: #374151; margin-top: 0.5rem;">
+            <div style="margin-bottom: 0.25rem;">
+              <span style="color: #6b7280;">Bot：</span>
+              <span id="configuredBotToken" style="font-weight: 600;"></span>
+            </div>
+            <div>
+              <span style="color: #6b7280;">Chat ID：</span>
+              <span id="configuredChatId" style="font-weight: 600;"></span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Bot Token</label>
+          <input type="text" id="telegramBotToken" placeholder="从 @BotFather 获取">
+        </div>
+        <div class="form-group">
+          <label>Chat ID</label>
+          <input type="text" id="telegramChatId" placeholder="用户 ID 或 群组 ID">
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-primary" onclick="saveTelegramSettings()">保存</button>
+          <button class="btn btn-success" onclick="testTelegram()">测试</button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2>🔒 修改密码</h2>
+        <div class="form-group">
+          <label>当前密码</label>
+          <input type="password" id="oldPassword" placeholder="当前密码">
+        </div>
+        <div class="form-group">
+          <label>新密码 (至少6位)</label>
+          <input type="password" id="newPassword" placeholder="新密码">
+        </div>
+        <button class="btn btn-primary" onclick="changePassword()">修改密码</button>
+      </div>
+    </div>
+    
+    <!-- Help Tab -->
+    <div id="helpTab" class="hidden">
+      <div class="card">
+        <h2>📖 使用帮助</h2>
+        
+        <h3 style="margin: 1rem 0 0.5rem;">一、如何创建 Telegram Bot</h3>
+        <ol style="margin-left: 1.5rem; font-size: 0.9rem; line-height: 1.8;">
+          <li>在 Telegram 搜索 <b>@BotFather</b></li>
+          <li>发送命令 <code>/newbot</code></li>
+          <li>按照提示输入 Bot 名称（如：价格监控机器人）</li>
+          <li>设置用户名（必须以 bot 结尾，如 <code>PriceAlertBot</code>）</li>
+          <li>创建成功后，BotFather 会给你一个 <b>Bot Token</b>，复制保存好</li>
+        </ol>
+        
+        <h3 style="margin: 1rem 0 0.5rem;">二、如何获取 Bot Token</h3>
+        <ol style="margin-left: 1.5rem; font-size: 0.9rem; line-height: 1.8;">
+          <li>与 <b>@BotFather</b> 对话</li>
+          <li>发送 <code>/mybots</code></li>
+          <li>选择你的 Bot</li>
+          <li>点击 <b>API Token</b></li>
+          <li>就可以看到或重新生成 Bot Token</li>
+        </ol>
+        
+        <h3 style="margin: 1rem 0 0.5rem;">三、如何获取 Chat ID</h3>
+        <ol style="margin-left: 1.5rem; font-size: 0.9rem; line-height: 1.8;">
+          <li><b>方法1 - 私聊获取：</b>
+            <ul style="margin-left: 1rem;">
+              <li>在 Telegram 搜索 <b>@userinfobot</b> 或 <b>@getidsbot</b></li>
+              <li>发送 <code>/start</code></li>
+              <li>机器人会显示你的数字 ID（如 <code>6087032704</code>）</li>
+            </ul>
+          </li>
+          <li><b>方法2 - 私聊你的 Bot：</b>
+            <ul style="margin-left: 1rem;">
+              <li>与刚创建的 Bot 发起私聊</li>
+              <li>发送 <code>/start</code></li>
+              <li>在群里发消息让 Bot 看到，然后查询</ul>
+          </li>
+            </li>
+        </ol>
+        
+        <h3 style="margin: 1rem 0 0.5rem;">四、配置示例</h3>
+        <div style="background: #f3f4f6; padding: 1rem; border-radius: 4px; font-size: 0.85rem;">
+          <p><b>Bot Token 格式：</b> <code>1234567890:ABCdefGHIjklMNOpqrsTUVwxyz</code></p>
+          <p><b>Chat ID 格式：</b> <code>1234567890</code>（纯数字）或 <code>-1001234567890</code>（群组）</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Users Tab (Admin Only) -->
+    <div id="usersTab" class="hidden">
+      <div class="card">
+        <h2>👥 用户管理</h2>
+        <div class="form-row" style="margin-bottom: 1rem;">
+          <div class="form-group">
+            <label>新用户名</label>
+            <input type="text" id="newUsername" placeholder="用户名">
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="newUserPassword" placeholder="密码">
+          </div>
+          <div class="form-group">
+            <label>角色</label>
+            <select id="newUserRole">
+              <option value="user">普通用户</option>
+              <option value="admin">管理员</option>
+            </select>
+          </div>
+          <div class="form-group" style="display: flex; align-items: flex-end;">
+            <button class="btn btn-primary" onclick="createUser()">创建用户</button>
+          </div>
+        </div>
+        
+        <table class="user-table">
+          <thead>
+            <tr>
+              <th>用户名</th>
+              <th>角色</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="usersList"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div id="toast" class="toast hidden"></div>
+  
+  <script>
+    let token = localStorage.getItem('priceAlertToken');
+    let currentUser = null;
+    const API_BASE = '';
+    
+    // 检查登录状态
+    async function checkAuth() {
+      if (!token) {
+        showLogin();
+        return;
+      }
+      
+      try {
+        const userData = await apiCall('/api/me');
+        currentUser = userData;
+        showApp();
+        loadAlerts();
+        loadSettings();
+      } catch {
+        token = null;
+        localStorage.removeItem('priceAlertToken');
+        showLogin();
+      }
+    }
+    
+    async function apiCall(path, options = {}) {
+      const response = await fetch(API_BASE + path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          ...options.headers
+        }
+      });
+      
+      if (response.status === 401) {
+        token = null;
+        localStorage.removeItem('priceAlertToken');
+        showLogin();
+        throw new Error('Unauthorized');
+      }
+      
+      return response.json();
+    }
+    
+    function showLogin() {
+      document.getElementById('loginPage').classList.remove('hidden');
+      document.getElementById('mainApp').classList.add('hidden');
+    }
+    
+    function showApp() {
+      document.getElementById('loginPage').classList.add('hidden');
+      document.getElementById('mainApp').classList.remove('hidden');
+      document.getElementById('userInfo').classList.remove('hidden');
+      document.getElementById('logoutBtn').classList.remove('hidden');
+      
+      // 显示用户信息
+      document.getElementById('currentUsername').textContent = currentUser.username;
+      document.getElementById('currentRole').textContent = currentUser.role === 'admin' ? '管理员' : '用户';
+      
+      // 管理员显示用户管理按钮
+      if (currentUser.role === 'admin') {
+        document.getElementById('adminUsersBtn').classList.remove('hidden');
+      }
+      
+      // 默认显示概览
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.nav-btn').classList.add('active');
+      
+      document.getElementById('dashboardTab').classList.remove('hidden');
+      document.getElementById('alertsTab').classList.add('hidden');
+      document.getElementById('eventsTab').classList.add('hidden');
+      document.getElementById('settingsTab').classList.add('hidden');
+      document.getElementById('helpTab').classList.add('hidden');
+      document.getElementById('usersTab').classList.add('hidden');
+      
+      loadDashboard();
+    }
+    
+    async function doLogin() {
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      if (!username || !password) return;
+      
+      const result = await fetch(API_BASE + '/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      }).then(r => r.json());
+      
+      if (result.success) {
+        token = result.token;
+        currentUser = result.user;
+        localStorage.setItem('priceAlertToken', token);
+        showApp();
+        loadAlerts();
+        loadSettings();
+      } else {
+        showToast(result.error || '登录失败');
+      }
+    }
+    
+    function logout() {
+      token = null;
+      currentUser = null;
+      localStorage.removeItem('priceAlertToken');
+      showLogin();
+    }
+    
+    function showTab(tab) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      document.getElementById('dashboardTab').classList.add('hidden');
+      document.getElementById('alertsTab').classList.add('hidden');
+      document.getElementById('eventsTab').classList.add('hidden');
+      document.getElementById('settingsTab').classList.add('hidden');
+      document.getElementById('helpTab').classList.add('hidden');
+      document.getElementById('usersTab').classList.add('hidden');
+      document.getElementById(tab + 'Tab').classList.remove('hidden');
+      
+      if (tab === 'dashboard') loadDashboard();
+      if (tab === 'events') loadEvents();
+      if (tab === 'settings') loadSettings();
+      if (tab === 'users' && currentUser.role === 'admin') loadUsers();
+    }
+    
+    // Dashboard
+    async function loadDashboard() {
+      const alerts = await apiCall('/api/alerts');
+      const events = await apiCall('/api/events?limit=100');
+      
+      const total = alerts.length;
+      const enabled = alerts.filter(a => a.is_enabled).length;
+      
+      document.getElementById('dashAlerts').textContent = total;
+      document.getElementById('dashEnabled').textContent = enabled;
+      document.getElementById('dashEvents').textContent = events.length;
+      
+      // 显示规则列表
+      const container = document.getElementById('dashboardAlertsList');
+      if (!alerts.length) {
+        container.innerHTML = '<div class="empty-state">暂无规则，点击"新建规则"创建</div>';
+        return;
+      }
+      
+      container.innerHTML = alerts.map(alert => `
+        <div class="alert-item">
+          <div class="alert-info">
+            <span class="alert-symbol">${alert.symbol}</span>
+            <span class="badge ${alert.is_enabled ? 'badge-enabled' : 'badge-disabled'}">
+              ${alert.is_enabled ? '启用' : '禁用'}
+            </span>
+            <div class="alert-condition">
+              ${alert.condition_type} | 阈值: ${alert.threshold} | 间隔: ${alert.poll_interval_sec}秒
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // Alerts
+    async function loadAlerts() {
+      const alerts = await apiCall('/api/alerts');
+      const container = document.getElementById('alertsList');
+      
+      if (!alerts.length) {
+        container.innerHTML = '<div class="empty-state">暂无规则，点击上方创建</div>';
+        return;
+      }
+      
+      container.innerHTML = alerts.map(alert => `
+        <div class="alert-item">
+          <div class="alert-info">
+            <span class="alert-symbol">${alert.symbol}</span>
+            <span class="badge ${alert.is_enabled ? 'badge-enabled' : 'badge-disabled'}">
+              ${alert.is_enabled ? '启用' : '禁用'}
+            </span>
+            <div class="alert-condition">
+              ${alert.condition_type} | 阈值: ${alert.threshold} | 间隔: ${alert.poll_interval_sec}秒 | 冷却: ${alert.cooldown_sec}秒 | 提醒: ${alert.notify_times || 1}次
+            </div>
+          </div>
+          <div class="alert-actions">
+            <button class="btn btn-secondary btn-sm" onclick="testAlert('${alert.id}')">测试</button>
+            <button class="btn btn-${alert.is_enabled ? 'secondary' : 'success'} btn-sm" onclick="toggleAlert('${alert.id}', ${!alert.is_enabled})">
+              ${alert.is_enabled ? '禁用' : '启用'}
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteAlert('${alert.id}')">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    async function createAlert(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        symbol: form.symbol.value.toUpperCase(),
+        condition_type: form.condition_type.value,
+        threshold: parseFloat(form.threshold.value),
+        poll_interval_sec: parseInt(form.poll_interval_sec.value),
+        cooldown_sec: parseInt(form.cooldown_sec.value),
+        notify_times: parseInt(form.notify_times.value) || 1,
+        is_enabled: form.is_enabled.checked
+      };
+      
+      const result = await apiCall('/api/alerts', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      
+      if (result.id) {
+        showToast('规则创建成功');
+        form.reset();
+        loadAlerts();
+      } else {
+        showToast(result.error || '创建失败');
+      }
+    }
+    
+    async function toggleAlert(id, isEnabled) {
+      await apiCall(`/api/alerts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_enabled: isEnabled })
+      });
+      loadAlerts();
+    }
+    
+    async function deleteAlert(id) {
+      if (!confirm('确定删除?')) return;
+      await apiCall(`/api/alerts/${id}`, { method: 'DELETE' });
+      loadAlerts();
+    }
+    
+    async function testAlert(id) {
+      const result = await apiCall(`/api/alerts/${id}/test`, { method: 'POST' });
+      showToast(result.success ? '测试消息已发送' : (result.error || '发送失败'));
+    }
+    
+    // Events
+    async function loadEvents() {
+      const symbol = document.getElementById('eventSymbolFilter').value;
+      const events = await apiCall('/api/events' + (symbol ? `?symbol=${symbol}` : ''));
+      const tbody = document.querySelector('#eventsTable tbody');
+      
+      if (!events.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无日志</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = events.map(e => `
+        <tr>
+          <td>${new Date(e.triggered_at * 1000).toLocaleString('zh-CN')}</td>
+          <td>${e.event_type}</td>
+          <td>${e.reason || '-'}</td>
+          <td>${e.price ? e.price.toLocaleString() : '-'}</td>
+          <td>${e.threshold ? e.threshold.toLocaleString() : '-'}</td>
+          <td class="status-${e.notify_status}">${e.notify_status}</td>
+        </tr>
+      `).join('');
+    }
+    
+    // Settings
+    async function loadSettings() {
+      const settings = await apiCall('/api/settings');
+      document.getElementById('telegramChatId').value = settings.telegram?.chat_id || '';
+      document.getElementById('telegramBotToken').value = '';
+      
+      // 更新状态显示
+      const statusEl = document.getElementById('telegramStatus');
+      const infoEl = document.getElementById('telegramInfo');
+      
+      if (settings.telegram?.configured) {
+        statusEl.textContent = '✅ 已配置';
+        statusEl.style.background = '#d1fae5';
+        statusEl.style.color = '#065f46';
+        
+        // 显示已配置的 Telegram 信息
+        infoEl.classList.remove('hidden');
+        const botToken = settings.telegram.bot_token || '';
+        const chatId = settings.telegram.chat_id || '';
+        
+        // 获取 bot 用户名
+        try {
+          const botInfo = await fetch(`https://api.telegram.org/bot${botToken}/getMe`).then(r => r.json());
+          const botUsername = botInfo.result?.username ? '@' + botInfo.result.username : 'Bot';
+          document.getElementById('configuredBotToken').textContent = botUsername;
+        } catch {
+          document.getElementById('configuredBotToken').textContent = 'Bot';
+        }
+        
+        document.getElementById('configuredChatId').textContent = chatId;
+      } else {
+        statusEl.textContent = '❌ 未配置';
+        statusEl.style.background = '#fee2e2';
+        statusEl.style.color = '#991b1b';
+        infoEl.classList.add('hidden');
+      }
+    }
+    
+    async function deleteTelegramConfig() {
+      if (!confirm('确定删除 Telegram 配置？')) return;
+      
+      const result = await apiCall('/api/settings/telegram', { method: 'DELETE' });
+      if (result.success) {
+        showToast('配置已删除');
+        loadSettings();
+      } else {
+        showToast(result.error || '删除失败');
+      }
+    }
+    
+    async function saveTelegramSettings() {
+      const bot_token = document.getElementById('telegramBotToken').value;
+      const chat_id = document.getElementById('telegramChatId').value;
+      
+      await apiCall('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ telegram: { bot_token, chat_id } })
+      });
+      
+      showToast('保存成功');
+    }
+    
+    async function changePassword() {
+      const old_password = document.getElementById('oldPassword').value;
+      const new_password = document.getElementById('newPassword').value;
+      
+      if (!old_password || !new_password) {
+        showToast('请填写当前密码和新密码');
+        return;
+      }
+      
+      const result = await apiCall('/api/settings/password', {
+        method: 'POST',
+        body: JSON.stringify({ old_password, new_password })
+      });
+      
+      if (result.success) {
+        showToast('密码修改成功');
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newPassword').value = '';
+      } else {
+        showToast(result.error || '修改失败');
+      }
+    }
+    
+    async function testTelegram() {
+      const bot_token = document.getElementById('telegramBotToken').value;
+      const chat_id = document.getElementById('telegramChatId').value;
+      
+      if (!bot_token || !chat_id) {
+        showToast('请先填写 Bot Token 和 Chat ID');
+        return;
+      }
+      
+      const result = await apiCall('/api/settings/telegram/test', {
+        method: 'POST',
+        body: JSON.stringify({ bot_token, chat_id })
+      });
+      
+      showToast(result.success ? '测试消息已发送' : (result.error || '发送失败'));
+    }
+    
+    // Users (Admin)
+    async function loadUsers() {
+      const users = await apiCall('/api/admin/users');
+      const tbody = document.getElementById('usersList');
+      
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td>${u.username}</td>
+          <td class="role-${u.role}">${u.role === 'admin' ? '管理员' : '普通用户'}</td>
+          <td>${new Date(u.created_at * 1000).toLocaleString('zh-CN')}</td>
+          <td>
+            ${u.role !== 'admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">删除</button>` : '-'}
+          </td>
+        </tr>
+      `).join('');
+    }
+    
+    async function createUser() {
+      const username = document.getElementById('newUsername').value;
+      const password = document.getElementById('newUserPassword').value;
+      const role = document.getElementById('newUserRole').value;
+      
+      if (!username || !password) {
+        showToast('请填写用户名和密码');
+        return;
+      }
+      
+      const result = await apiCall('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({ username, password, role })
+      });
+      
+      if (result.id) {
+        showToast('用户创建成功');
+        document.getElementById('newUsername').value = '';
+        document.getElementById('newUserPassword').value = '';
+        loadUsers();
+      } else {
+        showToast(result.error || '创建失败');
+      }
+    }
+    
+    async function deleteUser(id) {
+      if (!confirm('确定删除该用户？其所有数据将被清除')) return;
+      
+      const result = await apiCall(`/api/admin/users/${id}`, { method: 'DELETE' });
+      if (result.success) {
+        showToast('用户已删除');
+        loadUsers();
+      } else {
+        showToast(result.error || '删除失败');
+      }
+    }
+    
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+    
+    // Init
+    checkAuth();
+  </script>
+</body>
+</html>

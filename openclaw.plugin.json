@@ -1,0 +1,8 @@
+{
+  "id": "price-alert",
+  "name": "Price Alert",
+  "description": "Crypto price monitoring and alerting system",
+  "type": "extension",
+  "entry": "src/index.ts",
+  "enabled": true
+}
