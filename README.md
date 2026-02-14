@@ -14,7 +14,7 @@
 
 ## 快速开始
 
-### 安装依赖
+### 下载安装
 ```bash
 # 克隆项目
 git clone https://github.com/Onpicex/Crypto-price-alert.git
@@ -23,7 +23,10 @@ git clone https://github.com/Onpicex/Crypto-price-alert.git
 ### 安装依赖
 
 ```bash
+# 进入项目目录
 cd Crypto-price-alert
+
+# 安装依赖
 npm install express axios cors
 ```
 
